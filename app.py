@@ -1,9 +1,37 @@
 import os, httpx
+import os
+from openai import AzureOpenAI
 from fastapi import FastAPI, Request, Header, BackgroundTasks
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]          # set in Railway
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET") # optional
+
+def llmc(msgpar):
+
+    client = AzureOpenAI(
+        api_version=os.environ["API_VERSION"], #   api_version,
+        azure_endpoint=os.environ["ENDPOINT_URL"], #endpoint,
+        api_key=os.environ["API_KEY"], #subscription_key,
+    )
+
+    response = client.chat.completions.create(
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a helpful assistant.",
+            },
+            {
+                "role": "user",
+                "content": msgpar,
+            }
+        ],
+        max_completion_tokens=40000,
+        model=os.environ["DEPLOYMENT_NAME"]
+    )
+
+    return str(response.choices[0].message.content )
+    #print(response.choices[0].message.content)    
 
 app = FastAPI()
 
@@ -33,7 +61,10 @@ async def webhook(
     if msg:
         chat_id = msg["chat"]["id"]
         text = msg.get("text") or "👋"
-        background.add_task(send_message, chat_id, f"You said: {text}")
+
+        aws=llmc(text)
+        background.add_task(send_message, chat_id, aws)
+        #background.add_task(send_message, chat_id, f"You said: {text}")
 
     # Respond fast; do the heavy work in background
     return {"ok": True}
